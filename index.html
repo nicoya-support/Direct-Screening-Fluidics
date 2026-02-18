@@ -762,7 +762,7 @@
                 const srcEl = document.getElementById(d.sourceId);
                 const srcColNum = parseInt(d.sourceId.match(/\d+$/)[0]); 
                 const gapEl = document.getElementById(`gap-${srcColNum}`);
-                if(!srcEl || !gapEl || getComputedStyle(srcEl).lity === 'hidden') return Promise.resolve();
+                if(!srcEl || !gapEl || getComputedStyle(srcEl).visibility === 'hidden') return Promise.resolve();
                 d.element = createDrop(srcEl, d.color, d.offset);
                 const start = getLocalCoords(srcEl); start.x += d.offset;
                 const end = getLocalCoords(gapEl); end.x += d.offset;
