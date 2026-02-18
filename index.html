@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Screening - Unified App</title>
+    <style>
+        /* --- BRAND PALETTE --- */
+        :root {
+            --nicoya-dark-blue: #212B38;
+            --nicoya-light-blue: #67CBDF; /* Key Highlight Color */
+            --nicoya-white: #FFFFFF;
+            --nicoya-yellow: #E9C259;
+            --nicoya-light-grey: #F2F2F2;
+            --nicoya-border: #E0E0E0;
+            --sidebar-width: 280px;
+        }
+
+        /* --- LAYOUT --- */
+        body {
+            font-family: 'Montserrat', 'Segoe UI', sans-serif;
+            margin: 0; height: 100vh; width: 100vw;
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr var(--sidebar-width);
+            grid-template-rows: min-content 1fr;
+            grid-template-areas: "header header header" "left main right";
+            overflow: hidden; background-color: #FAFAFA;
+        }
+
+        @media (max-width: 1100px) {
+            body {
+                grid-template-columns: var(--sidebar-width) 1fr;
+                grid-template-rows: min-content 1fr 140px; 
+                grid-template-areas: "header header" "left main" "left right";
+            }
+            .sidebar-right {
+                border-left: none !important;
+                border-top: 1px solid var(--nicoya-border);
+                flex-direction: row !important;
+                gap: 20px; padding: 0.5rem 1rem !important; align-items: flex-start;
+            }
+            .sidebar-right .details-header-group {
+                min-width: 140px; margin-bottom: 0 !important;
+                display: flex; flex-direction: column; justify-content: center; height: 100%;
+            }
+            .table-container { flex: 1; height: 100%; overflow-y: auto; }
+            .data-table th { position: sticky; top: 0; background: white; z-index: 2; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        }
+
+        header {
+            grid-area: header;
+            background-color: var(--nicoya-white);
+            border-bottom: 1px solid var(--nicoya-border);
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
+            flex-wrap: wrap;         
+            padding: 10px 2rem;      
+            gap: 15px;               
+            min-height: 70px;        
+            height: auto;            
+            z-index: 20; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .brand { 
+            font-weight: 800; 
+            font-size: 1.3rem; 
+            color: var(--nicoya-dark-blue); 
+            display:flex; 
+            align-items:center; 
+            gap:10px; 
+            min-width: 220px;
+        }
+        
+        /* Config Panel Layout */
+        .config-panel { 
+            display: flex; 
+            gap: 1rem 2rem; 
+            align-items: center; 
+            height: 100%; 
+            flex-wrap: wrap;        
+            justify-content: flex-end; 
+            flex: 1;                
+        }
+        
+        .config-group { 
+            display: flex; align-items: center; gap: 0.8rem; 
+            padding: 0.5rem 0;
+            position: relative;
+        }
+        
+        .config-group:not(:last-child)::after {
+            content: ""; position: absolute; right: -1rem; top: 20%; height: 60%;
+            border-right: 1px solid #eee;
+        }
+
+        .config-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #999; letter-spacing: 0.5px; }
+        .hidden { display: none !important; }
+
+        /* --- SIDEBARS --- */
+        aside { background-color: var(--nicoya-white); overflow-y: auto; display: flex; flex-direction: column; z-index: 15; }
+        .sidebar-left { grid-area: left; border-right: 1px solid var(--nicoya-border); }
+        .sidebar-right { grid-area: right; border-left: 1px solid var(--nicoya-border); padding: 1.5rem; }
+
+        .sidebar-header { padding: 1.2rem; font-size: 0.85rem; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+        .activity-list { list-style: none; padding: 0; margin: 0; }
+        .activity-item { border-bottom: 1px solid #f5f5f5; }
+        .activity-btn { width: 100%; padding: 0.9rem 1.2rem; background: none; border: none; text-align: left; font-weight: 600; color: var(--nicoya-dark-blue); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; font-size: 0.9rem;}
+        .activity-btn:hover { background-color: #f9f9f9; }
+        .activity-item.open .activity-btn { background-color: #f0f7ff; color: var(--nicoya-light-blue); }
+        .drop-list { list-style: none; padding: 0; margin: 0; background-color: #FAFAFA; max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .activity-item.open .drop-list { max-height: 5000px; border-bottom: 1px solid var(--nicoya-border); }
+        .drop-item { padding: 0.6rem 1.2rem 0.6rem 2.2rem; font-size: 0.8rem; color: #555; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; transition: all 0.2s; }
+        .drop-item:hover { background-color: #eee; }
+        .drop-item.running { font-weight: 700; color: var(--nicoya-dark-blue); background-color: #e3f2fd; }
+        .drop-indicator { width: 8px; height: 8px; border-radius: 50%; background-color: #ddd; margin-right: 8px; }
+
+        .details-title { font-size: 1rem; font-weight: 800; color: var(--nicoya-dark-blue); margin-bottom: 0.5rem; }
+        .details-subtitle { font-size: 0.8rem; color: #777; margin-bottom: 1.5rem; }
+        
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .data-table th { text-align: left; padding: 8px; border-bottom: 2px solid var(--nicoya-border); color: #999; font-weight: 700; text-transform: uppercase; font-size: 0.7rem; }
+        .data-table td { padding: 10px 8px; border-bottom: 1px solid #eee; color: #333; font-weight: 600; vertical-align: middle; }
+        .source-tag { display: inline-block; padding: 4px 8px; border-radius: 4px; color: white; font-weight: 700; font-size: 0.75rem; min-width: 24px; text-align: center; margin-right: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+        /* --- SCALABLE CANVAS --- */
+        main { 
+            grid-area: main; background-color: #F0F2F5; position: relative; 
+            overflow: hidden; display: flex; justify-content: center; align-items: center; 
+        }
+
+        #scaler { transform-origin: center center; width: 1280px; height: 800px; display: flex; justify-content: center; align-items: center; }
+        .chip-card { background: white; width: 100%; height: 100%; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.1); padding: 20px 40px; position: relative; display: flex; flex-direction: column; }
+        
+        .chip-grid { 
+            display: grid; flex: 1; 
+            grid-template-rows: 30px 80px 60px 20px 70px repeat(9, 1fr) 70px; 
+            gap: 2px; 
+            position: relative; 
+        }
+
+        #pathOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
+
+        .mode-btn { border: 1px solid #ddd; background: white; padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700; color:#555; transition:0.2s; }
+        .mode-btn:hover { background:#f5f5f5; }
+        .mode-btn.active { background: var(--nicoya-dark-blue); color: white; border-color: var(--nicoya-dark-blue); }
+        
+        /* Toggle Switch (Generic) */
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e0e0e0; border-radius: 20px; transition: .4s; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; border-radius: 50%; transition: .4s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        input:checked + .slider { background-color: var(--nicoya-light-blue); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        /* Ligand Slider Styling */
+        #ligandRange {
+            accent-color: var(--nicoya-light-blue);
+            cursor: pointer;
+            height: 4px; border-radius:2px;
+        }
+
+        /* App Mode Toggle (Larger) */
+        .app-switch { position: relative; display: inline-block; width: 90px; height: 30px; }
+        .app-switch input { opacity: 0; width: 0; height: 0; }
+        .app-slider { 
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; 
+            background-color: var(--nicoya-dark-blue); 
+            border-radius: 6px; transition: .4s; 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 0 10px; font-size: 11px; font-weight: 800; 
+        }
+        
+        .app-slider:before { 
+            position: absolute; content: ""; height: 24px; width: 42px; left: 3px; bottom: 3px; 
+            background-color: white; border-radius: 4px; transition: .4s; z-index: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        input:checked + .app-slider:before { transform: translateX(42px); }
+        .app-label-l, .app-label-r { z-index: 2; transition: 0.3s; }
+        .app-label-l { color: var(--nicoya-light-blue); } 
+        .app-label-r { color: rgba(255,255,255,0.4); }   
+        input:checked + .app-slider .app-label-l { color: rgba(255,255,255,0.4); }
+        input:checked + .app-slider .app-label-r { color: var(--nicoya-light-blue); }
+
+        .row-label { font-size: 14px; font-weight: 700; color: #aaa; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px;}
+        .cell { position: relative; display: flex; justify-content: center; align-items: center; }
+
+        /* --- COMPONENT STYLES --- */
+        .mixer { 
+            width: 85%; height: 80%; 
+            background-color: var(--nicoya-yellow);
+            border-radius: 8px; 
+            z-index: 5; 
+            position: relative;
+            background-image: radial-gradient(rgba(255,255,255,0.6) 20%, transparent 20%); 
+            background-size: 10px 10px; 
+        }
+
+        .well { border-radius: 50%; border: 3px solid var(--nicoya-dark-blue); background: white; display: flex; justify-content: center; align-items: center; font-weight: 800; color: var(--nicoya-dark-blue); z-index: 12; transition: all 0.3s; position: relative; }
+        .well-s { width: 28px; height: 28px; font-size: 14px; }
+        .well-r { width: 44px; height: 44px; font-size: 14px; background-color: var(--nicoya-white); }
+        .well-bf { width: 48px; height: 48px; font-size: 15px; border-width: 4px; }
+        
+        .sensor-group { display: flex; gap: 6px; width: 80px; }
+        .sensor { 
+            flex: 1; height: 32px; 
+            background: #000000; color: #FFFFFF;
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 12px; font-weight: 800; border-radius: 3px; 
+            z-index: 12; 
+            transition: background-color 0.3s; 
+            position: relative; 
+        }
+
+        .lane-box { 
+            background: var(--nicoya-light-blue); 
+            width: 90px; height: 24px; 
+            display: flex; justify-content: center; align-items: center; 
+            border-radius: 4px; font-size: 12px; font-weight: 700; 
+            z-index: 12; position: relative; 
+            color: #fff;
+        }
+
+        .gap-point { width: 0px; height: 0px; background: #bbb; border-radius: 50%; z-index: 12; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); position: relative; }
+
+        .liquid-drop { position: absolute; width: 14px; height: 14px; border-radius: 50%; z-index: 100; box-shadow: 0 3px 6px rgba(0,0,0,0.3); pointer-events: none; will-change: top, left; }
+        .fluid-path { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.6; }
+        
+        #logPanel { position: absolute; bottom: 20px; right: 20px; background: rgba(33, 43, 56, 0.95); color: white; padding: 12px 20px; border-radius: 8px; font-size: 12px; z-index: 200; max-width: 300px; }
+        #chipTypeLabel { font-size: 0.7rem; color: #999; margin-left: 5px; background:#eee; padding:2px 4px; border-radius:4px; display:none;}
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            Direct Screening
+            <span id="chipTypeLabel">CMD</span>
+        </div>
+        
+        <div class="config-panel">
+            <div class="config-group">
+                <span class="config-label">Chemistry</span>
+                <label class="app-switch">
+                    <input type="checkbox" id="appModeToggle">
+                    <span class="app-slider">
+                        <span class="app-label-l">CMD</span>
+                        <span class="app-label-r">STV</span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="config-group">
+                <span class="config-label">Channels</span>
+                <button class="mode-btn" onclick="setMode(4)" id="btn-4">4</button>
+                <button class="mode-btn" onclick="setMode(8)" id="btn-8">8</button>
+                <button class="mode-btn active" onclick="setMode(16)" id="btn-16">16</button>
+            </div>
+
+            <div class="config-group stv-only hidden">
+                <span class="config-label">Unique Ligands</span>
+                <input type="range" id="ligandRange" min="1" max="8" value="1" oninput="updateLigandCount(this.value)">
+                <span id="ligandCountVal" style="font-weight:700; font-size:0.9rem; color:#333; min-width:15px; text-align:center;">1</span>
+            </div>
+
+            <div class="config-group">
+                <span class="config-label">Buffer Blanks</span>
+                <label class="switch">
+                    <input type="checkbox" id="blankToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="config-group cmd-only">
+                <span class="config-label">Auxiliary Buffer</span>
+                <label class="switch">
+                    <input type="checkbox" id="auxToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="config-group cmd-only">
+                <span class="config-label">Biotin-Avidin</span>
+                <label class="switch">
+                    <input type="checkbox" id="bioToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <aside class="sidebar-left">
+        <div class="sidebar-header" id="workflowHeader">Workflow</div>
+        <ul class="activity-list" id="activityList"></ul>
+    </aside>
+
+    <main id="mainContainer">
+        <div id="scaler">
+            <div class="chip-card" id="chipCard">
+                <svg id="pathOverlay"></svg>
+                <div id="chipGrid" class="chip-grid"></div>
+            </div>
+        </div>
+        <div id="logPanel">System Ready</div>
+    </main>
+
+    <aside class="sidebar-right">
+        <div class="details-header-group">
+            <div class="details-title" id="detailsTitle">Step Details</div>
+            <div class="details-subtitle" id="detailsSubtitle">Select a step to view mapping</div>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr> <th>Source Well</th> <th>Sensors</th> <th>Lane</th> </tr>
+                </thead>
+                <tbody id="detailsTableBody"><tr><td colspan="3" style="text-align:center;color:#ccc;">Waiting...</td></tr></tbody>
+            </table>
+        </div>
+    </aside>
+
+    <script>
+        // --- 1. CONFIG & COLORS ---
+        let appMode = 'CMD'; // 'CMD' or 'STV'
+
+        const colorsCMD = {
+            'R8': '#29B6F6', 'BF_LOCAL': '#29B6F6',
+            'A1': '#F50057', 'A2': '#00E676', 
+            'A3': '#6200EA', 'A4': '#304FFE', 
+            'A5': '#D50000', 'A6': '#AA00FF', 'MixEDC': '#F50057',
+            'R5': '#00C853', 'B_ROW': '#FF6D00',
+            'R1': '#FFAB91', 'R2': '#FF9100', 'R3': '#FF5252', 'R4': '#FFD180',
+            'Avidin': '#26C6DA',
+            'A7': '#00B0FF', 'A8': '#0091EA', 
+            'ANALYTE': '#AB47BC', 'BUFFER': '#29B6F6'
+        };
+
+        const colorsSTV = {
+            'R8': '#F50057', /* Norm Solution */
+            'R5': '#00E676', /* Shared Ligand Source (if Ligand=1) */
+            'R7': '#00B0FF', /* Active Ligand Source (if Ligand=1) */
+            'R1': '#FFAB91', 'R2': '#FF9100', 'R3': '#FF5252', 'R4': '#FFD180', /* Regen */
+            'ANALYTE': '#AB47BC', 
+            'LIGAND': '#00B0FF',
+            'BUFFER': '#29B6F6'
+        };
+
+        const getSourceColor = (wellId, typeContext) => {
+            const id = wellId.replace('well-', '');
+            
+            if (appMode === 'CMD') {
+                if(colorsCMD[id]) return colorsCMD[id];
+                if(id.startsWith('B') && !id.startsWith('BF')) return colorsCMD['B_ROW'];
+                if(id.startsWith('BF')) return colorsCMD['BF_LOCAL'];
+                if(id.startsWith('R') && ['1','2','3','4'].includes(id[1])) return colorsCMD[`R${id[1]}`];
+                if(id === 'R6') return colorsCMD['Avidin'];
+            } else {
+                // STV
+                if(colorsSTV[id]) return colorsSTV[id];
+                if(id.startsWith('BF')) return colorsSTV['BUFFER'];
+                if(id.startsWith('R') && ['1','2','3','4'].includes(id[1])) return colorsSTV[`R${id[1]}`];
+                if(typeContext === 'ligand-active') return colorsSTV['LIGAND'];
+                if(typeContext === 'ligand-ref') return colorsSTV['R5'];
+                if(typeContext === 'analyte') return colorsSTV['ANALYTE'];
+            }
+            
+            // Fallback Hash Color
+            let hash = 0;
+            for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+            const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+            return "#" + "00000".substring(0, 6 - c.length) + c;
+        }
+
+        // --- 2. STATE ---
+        let activeColumns = [1,2,3,4,5,6,7,8]; // Default 16ch
+        let currentMode = 16;
+        
+        // CMD Specific
+        let isAux = false;
+        let isBioAvidin = false; 
+        
+        // STV Specific
+        let numLigands = 1;
+        
+        // Shared
+        let showBlanks = false; 
+        
+        // --- 3. DOM ELEMENTS ---
+        const gridEl = document.getElementById('chipGrid');
+        const svgEl = document.getElementById('pathOverlay');
+        const chipCardEl = document.getElementById('chipCard');
+        const scalerEl = document.getElementById('scaler');
+        const logPanel = document.getElementById('logPanel');
+        const activityListEl = document.getElementById('activityList');
+        const tableBodyEl = document.getElementById('detailsTableBody');
+        const detailsTitleEl = document.getElementById('detailsTitle');
+        const detailsSubtitleEl = document.getElementById('detailsSubtitle');
+
+        // --- 4. WORKFLOW GENERATION ---
+        function getWorkflowCMD() {
+            const wf = [
+                { id: 'Startup', steps: [ { label: 'Buffer' } ] },
+                { id: 'Normalize', steps: [ { label: 'Normalization High' }, { label: 'Buffer' } ] },
+                { id: 'Clean', steps: [ { label: 'Clean' }, { label: 'Buffer' } ] }
+            ];
+
+            if (isBioAvidin) {
+                wf.push({ id: 'Build Avidin Surface', steps: [
+                     { label: 'EDC/NHS' }, { label: 'Buffer' }, { label: 'Avidin' },
+                     { label: 'Buffer' }, { label: 'Ethanolamine' }, { label: 'Buffer', forceBF: true }
+                ]});
+                // Note: forceBF:true ensures this uses BF wells even if Aux is ON
+                wf.push({ id: 'Immobilize Biotin Ligand', steps: [ { label: 'Bt-Ligand' }, { label: 'Buffer', forceBF: true } ] });
+            } else {
+                wf.push({ id: 'Build Surface', steps: [
+                    { label: 'EDC/NHS' }, { label: 'Buffer' }, { label: 'Ligand' },
+                    { label: 'Buffer' }, { label: 'Ethanolamine' }, { label: 'Buffer', forceBF: true }
+                ]});
+            }
+
+            wf.push({ id: 'Conditioning', steps: [ { label: 'Regeneration' }, { label: 'Buffer', forceBF: true } ] });
+            
+            // Screening Loop - clustered into rounds
+            ['C', 'D', 'E', 'F', 'G', 'H', 'I'].forEach((row, idx) => {
+                const roundSteps = [];
+                
+                if(showBlanks) {
+                    // Blank Cycle: Buffer Blank -> Regen -> Buffer (Wash)
+                    roundSteps.push(
+                        { label: 'Buffer Blank', isBlank: true, roundRow: row, type: 'analyte' },
+                        { label: 'Regeneration', isBlank: true },
+                        { label: 'Buffer', forceBF: true, isBlank: true }
+                    );
+                }
+
+                // Analyte Cycle
+                roundSteps.push(
+                    { label: 'Analyte', roundRow: row, type: 'analyte' },
+                    { label: 'Dissociation' },
+                    { label: 'Regeneration' }
+                );
+
+                wf.push({ id: `Direct Screening, Round ${idx+1} (Row ${row})`, steps: roundSteps });
+            });
+
+            // Final Blank Cycle if enabled
+            if(showBlanks) {
+                wf.push({ id: 'Final Blank Cycle', steps: [
+                    { label: 'Buffer Blank', isBlank: true, roundRow: 'I', type: 'analyte' },
+                    { label: 'Regeneration', isBlank: true },
+                    { label: 'Buffer', forceBF: true, isBlank: true }
+                ]});
+            }
+
+            return wf;
+        }
+
+        function getWorkflowSTV() {
+            const wf = [
+                { id: 'Startup', steps: [ { label: 'Buffer' } ] },
+                { id: 'Normalize', steps: [ { label: 'Normalization' }, { label: 'Buffer' } ] },
+                { id: 'Build Capture', steps: [
+                    { label: 'Bt-Ligand' }, { label: 'Buffer' }
+                ]},
+                { id: 'Conditioning', steps: [ { label: 'Regeneration' }, { label: 'Buffer' } ] }
+            ];
+
+            const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+            const startIdx = (numLigands > 1) ? 1 : 0; // Skip A if it was used for Ligand
+            const activeRows = rows.slice(startIdx);
+
+            activeRows.forEach((row, idx) => {
+                const roundSteps = [];
+                
+                if(showBlanks) {
+                    // Blank Cycle
+                    roundSteps.push(
+                        { label: 'Buffer Blank', isBlank: true, roundRow: row, type: 'analyte' },
+                        { label: 'Regeneration', isBlank: true },
+                        { label: 'Buffer', forceBF: true, isBlank: true }
+                    );
+                }
+
+                // Analyte Cycle
+                roundSteps.push(
+                    { label: 'Analyte', roundRow: row, type: 'analyte' },
+                    { label: 'Dissociation' },
+                    { label: 'Regeneration' },
+                    { label: 'Buffer' }
+                );
+
+                wf.push({ id: `Direct Screening, Round ${idx + 1} (Row ${row})`, steps: roundSteps });
+            });
+
+            // Final Blank Cycle if enabled
+            if(showBlanks) {
+                wf.push({ id: 'Final Blank Cycle', steps: [
+                    { label: 'Buffer Blank', isBlank: true, roundRow: 'I', type: 'analyte' },
+                    { label: 'Regeneration', isBlank: true },
+                    { label: 'Buffer', forceBF: true, isBlank: true }
+                ]});
+            }
+
+            return wf;
+        }
+
+        // --- 5. LOGIC: Source Mapping ---
+        function getSourcesForColumn(actId, step, colIndex) {
+            if (appMode === 'CMD') return getSourcesCMD(actId, step, colIndex);
+            return getSourcesSTV(actId, step, colIndex);
+        }
+
+        // Helper to identify a kinetics/screening round block
+        function isKineticsBlock(actId) {
+            return actId.includes('Round') || actId.includes('Final Blank');
+        }
+
+        function getSourcesCMD(actId, step, colIndex) {
+            const stepName = step.label;
+            
+            // Priority 1: Forced Buffer or explicit Blank flags for Wash/Buffer steps
+            if (step.forceBF) return [{ id: `well-BF${colIndex}`, off: 0, side: 'Both', type: 'buffer' }];
+            
+            // Priority 2: Generic Buffer/Dissociation steps
+            if (stepName === 'Dissociation') {
+                 return [{ id: `well-BF${colIndex}`, off: 0, side: 'Both', type: 'buffer' }];
+            }
+
+            if (stepName.includes('Buffer') && !step.type) {
+                // If it's a kinetics block, buffer steps usually come from BF
+                if (isKineticsBlock(actId)) return [{ id: `well-BF${colIndex}`, off: 0, side: 'Both', type: 'buffer' }];
+                // Otherwise use Aux logic (R8) if Aux is enabled
+                return [{ id: isAux ? 'well-R8' : `well-BF${colIndex}`, off: 0, side: 'Both', type: 'buffer' }];
+            }
+
+            if (stepName.includes('Normalize') || stepName === 'Normalization High') {
+                return [{ id: (colIndex % 2 !== 0) ? 'well-A1' : 'well-A2', off: 0, side: 'Both' }];
+            }
+
+            // Analyte & Blank Sample logic (Uses step.type='analyte' instead of name matching)
+            if (isKineticsBlock(actId) && step.type === 'analyte') {
+                if(step.isBlank) {
+                    // Buffer Blank: Draw from Buffer
+                    return [{ id: `well-BF${colIndex}`, off: 0, type: 'buffer', side: 'Both' }];
+                }
+                // Actual Analyte: Draw ONLY from Sample (No Dilution in Screening)
+                return [
+                    { id: `well-${step.roundRow}${colIndex}`, off: 0, type: 'analyte', side: 'Both' }
+                ];
+            }
+
+            if (stepName.includes('EDC/NHS')) return [ { id: 'well-A5', off: -5, side: 'Both' }, { id: 'well-A6', off: 5, side: 'Both' } ];
+            if (stepName.includes('Ligand') || stepName === 'Bt-Ligand') {
+                return [ { id: 'well-R5', off: -5, side: 'L' }, { id: `well-B${colIndex}`, off: 5, side: 'R' } ];
+            }
+            
+            if (stepName.includes('Regeneration')) {
+                const s1 = (colIndex * 2) - 1;
+                let rWell = 'well-R4';
+                if ([1,2,9,10].includes(s1)) rWell = 'well-R1';
+                else if ([3,4,11,12].includes(s1)) rWell = 'well-R2';
+                else if ([5,6,13,14].includes(s1)) rWell = 'well-R3';
+                return [{ id: rWell, off: 0, side: 'Both' }];
+            }
+            if (stepName.includes('Clean')) return [{ id: (colIndex % 2 !== 0) ? 'well-A3' : 'well-A4', off: 0, side: 'Both' }];
+            if (stepName.includes('Ethanolamine')) return [{ id: (colIndex % 2 !== 0) ? 'well-A7' : 'well-A8', off: 0, side: 'Both' }];
+            if (stepName.includes('Avidin')) return [{ id: 'well-R6', off: 0, side: 'Both' }];
+            return [];
+        }
+
+        function getSourcesSTV(actId, step, colIndex) {
+            const stepName = step.label;
+            
+            // Priority 1: Forced Buffer or explicit Blank flags
+            if (step.forceBF) return [{ id: `well-BF${colIndex}`, off: 0, side: 'Both', type: 'buffer' }];
+
+            if (stepName === 'Dissociation') {
+                 return [{ id: `well-BF${colIndex}`, off: 0, side: 'Both', type: 'buffer' }];
+            }
+
+            if (stepName.includes('Buffer') && !step.type) {
+                return [{ id: `well-BF${colIndex}`, off: 0, side: 'Both', type: 'buffer' }];
+            }
+            if (stepName.includes('Normalization')) {
+                return [{ id: 'well-R8', off: 0, side: 'Both', type: 'norm' }];
+            }
+            if (stepName === 'Bt-Ligand') {
+                const sources = [ { id: 'well-R5', off: -4, side: 'L', type: 'ligand-ref' } ];
+                if (numLigands === 1) {
+                    sources.push({ id: 'well-R7', off: 4, side: 'R', type: 'ligand-active' });
+                } else {
+                    sources.push({ id: `well-A${colIndex}`, off: 4, side: 'R', type: 'ligand-active' });
+                }
+                return sources;
+            }
+            if (stepName.includes('Regeneration')) {
+                const s1 = (colIndex * 2) - 1;
+                let rWell = 'well-R4';
+                if ([1,2,9,10].includes(s1)) rWell = 'well-R1';
+                else if ([3,4,11,12].includes(s1)) rWell = 'well-R2';
+                else if ([5,6,13,14].includes(s1)) rWell = 'well-R3';
+                return [{ id: rWell, off: 0, side: 'Both', type: 'regen' }];
+            }
+            // Analyte & Blank Sample logic (Uses step.type='analyte')
+            if (isKineticsBlock(actId) && step.type === 'analyte') {
+                 if(step.isBlank) {
+                    return [{ id: `well-BF${colIndex}`, off: 0, type: 'buffer', side: 'Both' }];
+                 }
+                 // Actual Analyte: Draw ONLY from Sample (No Dilution in Screening)
+                 return [
+                    { id: `well-${step.roundRow}${colIndex}`, off: 0, type: 'analyte', side: 'Both' }
+                ];
+            }
+            return [];
+        }
+
+        // --- 6. RENDER TABLE ---
+        function renderDetailsTable(actId, step) {
+            detailsTitleEl.textContent = step.label;
+            detailsSubtitleEl.textContent = actId;
+            tableBodyEl.innerHTML = '';
+
+            const isAnalyteStep = isKineticsBlock(actId) && step.type === 'analyte' && !step.isBlank;
+
+            activeColumns.forEach((col, idx) => {
+                let sources = getSourcesForColumn(actId, step, col);
+                const logicalLane = idx + 1;
+                const sensLeft = (idx * 2) + 1;
+                const sensRight = (idx * 2) + 2;
+
+                const createRow = (srcList) => {
+                    const tr = document.createElement('tr');
+                    const tdSrc = document.createElement('td');
+                    srcList.forEach(src => {
+                        let isAn = isAnalyteStep && src.type === 'analyte'; // CMD logic
+                        if (appMode === 'STV') isAn = false; 
+                        tdSrc.appendChild(createSourceTag(src.id, isAn, src.type));
+                    });
+                    tr.appendChild(tdSrc);
+                    const tdSens = document.createElement('td'); 
+                    if(srcList.some(s => s.side === 'L')) tdSens.textContent = `${sensLeft}`;
+                    else if(srcList.some(s => s.side === 'R')) tdSens.textContent = `${sensRight}`;
+                    else tdSens.textContent = `${sensLeft}, ${sensRight}`;
+                    tr.appendChild(tdSens);
+                    const tdCh = document.createElement('td'); tdCh.textContent = logicalLane; tr.appendChild(tdCh);
+                    return tr;
+                };
+
+                const bothSources = sources.filter(s => s.side === 'Both' || !s.side);
+                if (bothSources.length > 0) tableBodyEl.appendChild(createRow(bothSources));
+                const leftSources = sources.filter(s => s.side === 'L');
+                if (leftSources.length > 0) tableBodyEl.appendChild(createRow(leftSources));
+                const rightSources = sources.filter(s => s.side === 'R');
+                if (rightSources.length > 0) tableBodyEl.appendChild(createRow(rightSources));
+            });
+        }
+
+        function createSourceTag(wellId, forceAnalyteColor, typeContext) {
+            const tag = document.createElement('span'); 
+            tag.className = 'source-tag';
+            if (forceAnalyteColor && appMode === 'CMD') {
+                tag.style.backgroundColor = colorsCMD['ANALYTE'];
+            } else {
+                tag.style.backgroundColor = getSourceColor(wellId, typeContext);
+            }
+            tag.textContent = wellId.replace('well-', '');
+            return tag;
+        }
+
+        // --- 7. ANIMATION ENGINE ---
+        function getLocalCoords(el) {
+            let x = 0; let y = 0; let curr = el;
+            while(curr && curr.id !== 'chipCard') {
+                x += curr.offsetLeft; y += curr.offsetTop;
+                curr = curr.offsetParent;
+            }
+            x += el.offsetWidth / 2; y += el.offsetHeight / 2;
+            return { x, y };
+        }
+
+        function createDrop(el, color, offX = 0) {
+            const d = document.createElement('div');
+            d.className = 'liquid-drop'; d.style.backgroundColor = color;
+            const c = getLocalCoords(el);
+            d.style.left = (c.x + offX - 7) + 'px'; d.style.top = (c.y - 7) + 'px';
+            chipCardEl.appendChild(d);
+            return d;
+        }
+
+        const SPEED_PX_PER_SEC = 500; 
+
+        async function animateDirect(el, start, end, color, pref) {
+            return new Promise(resolve => {
+                el.style.left = (start.x - 7) + 'px'; el.style.top = (start.y - 7) + 'px';
+                if(Math.abs(start.x - end.x) < 1 && Math.abs(start.y - end.y) < 1) { resolve(); return; }
+
+                let elbow = (pref === 'x-first') ? { x: end.x, y: start.y } : { x: start.x, y: end.y };
+                const d1 = Math.hypot(elbow.x - start.x, elbow.y - start.y);
+                const d2 = Math.hypot(end.x - elbow.x, end.y - elbow.y);
+                const totalDist = d1 + d2;
+                if(totalDist < 1) { resolve(); return; }
+
+                const duration = (totalDist / SPEED_PX_PER_SEC) * 1000;
+                const keyframes = [];
+                keyframes.push({ left: (start.x - 7) + 'px', top: (start.y - 7) + 'px', offset: 0 });
+                if(d1 > 1 && d2 > 1) {
+                    keyframes.push({ left: (elbow.x - 7) + 'px', top: (elbow.y - 7) + 'px', offset: d1/totalDist });
+                }
+                keyframes.push({ left: (end.x - 7) + 'px', top: (end.y - 7) + 'px', offset: 1 });
+
+                const anim = el.animate(keyframes, { duration: duration, easing: 'linear', fill: 'forwards' });
+                anim.onfinish = () => {
+                    drawPathLine(start, elbow, end, color);
+                    el.style.left = (end.x - 7) + 'px'; el.style.top = (end.y - 7) + 'px';
+                    resolve();
+                };
+            });
+        }
+
+        function drawPathLine(p1, p2, p3, color) {
+            const pts = `${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`;
+            const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            poly.setAttribute('points', pts); poly.setAttribute('class', 'fluid-path');
+            poly.style.stroke = color; poly.style.fill = 'none';
+            svgEl.appendChild(poly);
+        }
+
+        async function runStep(actId, step, uiEl) {
+            document.querySelectorAll('.drop-item').forEach(el => el.classList.remove('running'));
+            uiEl.classList.add('running');
+            clearVisuals();
+            renderDetailsTable(actId, step);
+            logPanel.innerHTML = `Action: ${step.label}<br>Status: Initializing...`;
+
+            let drops = [];
+            activeColumns.forEach((col, idx) => {
+                const sources = getSourcesForColumn(actId, step, col);
+                sources.forEach(src => {
+                    let color = getSourceColor(src.id, src.type);
+                    // Override CMD analyte logic (purple for analyte)
+                    if (appMode === 'CMD' && isKineticsBlock(actId) && step.type === 'analyte' && !step.isBlank) {
+                        if(src.type === 'analyte') color = colorsCMD['ANALYTE'];
+                        if(src.type === 'buffer') color = colorsCMD['BUFFER'];
+                    }
+                    drops.push({ targetCol: col, sourceId: src.id, color: color, offset: src.off, type: src.type, side: src.side });
+                });
+            });
+
+            if(drops.length === 0) { logPanel.innerHTML = "No active sources."; return; }
+
+            drops.forEach(d => {
+                const el = document.getElementById(d.sourceId);
+                if(el) { 
+                    el.style.backgroundColor = d.color; 
+                    el.style.borderColor = d.color; 
+                    el.style.color = '#fff'; 
+                }
+            });
+
+            // 1. To Gap
+            const p1 = drops.map(d => {
+                const srcEl = document.getElementById(d.sourceId);
+                const srcColNum = parseInt(d.sourceId.match(/\d+$/)[0]); 
+                const gapEl = document.getElementById(`gap-${srcColNum}`);
+                if(!srcEl || !gapEl || getComputedStyle(srcEl).visibility === 'hidden') return Promise.resolve();
+                d.element = createDrop(srcEl, d.color, d.offset);
+                const start = getLocalCoords(srcEl); start.x += d.offset;
+                const end = getLocalCoords(gapEl); end.x += d.offset;
+                return animateDirect(d.element, start, end, d.color, 'y-first');
+            });
+            await Promise.all(p1);
+
+            // 2. Align
+            const p2 = drops.map(d => {
+                if(!d.element) return Promise.resolve();
+                const srcColNum = parseInt(d.sourceId.match(/\d+$/)[0]); 
+                if(srcColNum === d.targetCol) return Promise.resolve();
+                const gapStart = document.getElementById(`gap-${srcColNum}`);
+                const gapEnd = document.getElementById(`gap-${d.targetCol}`);
+                const start = getLocalCoords(gapStart); start.x += d.offset;
+                const end = getLocalCoords(gapEnd); end.x += d.offset;
+                return animateDirect(d.element, start, end, d.color, 'x-first');
+            });
+            await Promise.all(p2);
+
+            // 3. To Mixer
+            const p3 = drops.map(d => {
+                if(!d.element) return Promise.resolve();
+                const gapEl = document.getElementById(`gap-${d.targetCol}`);
+                const mixEl = document.getElementById(`mix-${d.targetCol}`);
+                const start = getLocalCoords(gapEl); start.x += d.offset;
+                const end = getLocalCoords(mixEl); end.x += d.offset;
+                return animateDirect(d.element, start, end, d.color, 'y-first');
+            });
+            await Promise.all(p3);
+            await new Promise(r => setTimeout(r, 100));
+
+            // 4. Mixing / Delivery
+            // IN DIRECT SCREENING: NO SERIAL DILUTION ANIMATION. 
+            // We proceed directly to Standard Delivery for all steps.
+            
+            // STANDARD MIX / DELIVERY
+            const mixPromises = activeColumns.map(async (col) => { 
+                const colDrops = drops.filter(d => d.targetCol === col && d.element);
+                if(colDrops.length === 0) return;
+                const mixer = document.getElementById(`mix-${col}`);
+                
+                colDrops.forEach(d => {
+                    d.element.style.transition = 'transform 0.4s, opacity 0.4s';
+                    d.element.style.transform = 'scale(0.1)'; d.element.style.opacity = '0';
+                });
+                await new Promise(r => setTimeout(r, 450));
+                colDrops.forEach(d => d.element.remove());
+
+                const center = getLocalCoords(mixer);
+                const sL = document.getElementById(`s-${col}-L`); 
+                const sR = document.getElementById(`s-${col}-R`); 
+                const endL = getLocalCoords(sL);
+                const endR = getLocalCoords(sR);
+                
+                // Logic Variation for CMD "Split" vs STV "Deliver"
+                if (appMode === 'CMD' && step.label.includes('EDC/NHS')) {
+                    const mixColor = colorsCMD['MixEDC'];
+                    const dL = createDrop(mixer, mixColor, 0); const dR = createDrop(mixer, mixColor, 0);
+                    await Promise.all([
+                        animateDirect(dL, center, endL, mixColor, 'x-first').then(() => { sL.style.backgroundColor = mixColor; dL.remove(); }),
+                        animateDirect(dR, center, endR, mixColor, 'x-first').then(() => { sR.style.backgroundColor = mixColor; dR.remove(); })
+                    ]);
+                } else {
+                    // General delivery based on side
+                    const leftDrop = colDrops.find(d => d.side === 'L');
+                    const rightDrop = colDrops.find(d => d.side === 'R');
+                    const bothDrop = colDrops.find(d => d.side === 'Both');
+
+                    const pArr = [];
+                    if (leftDrop) {
+                        const dL = createDrop(mixer, leftDrop.color, -4);
+                        pArr.push(animateDirect(dL, center, endL, leftDrop.color, 'x-first').then(() => { sL.style.backgroundColor = leftDrop.color; dL.remove(); }));
+                    } else if (bothDrop) {
+                        const dL = createDrop(mixer, bothDrop.color, 0);
+                        pArr.push(animateDirect(dL, center, endL, bothDrop.color, 'x-first').then(() => { sL.style.backgroundColor = bothDrop.color; dL.remove(); }));
+                    }
+
+                    if (rightDrop) {
+                        const dR = createDrop(mixer, rightDrop.color, 4);
+                        pArr.push(animateDirect(dR, center, endR, rightDrop.color, 'x-first').then(() => { sR.style.backgroundColor = rightDrop.color; dR.remove(); }));
+                    } else if (bothDrop) {
+                        const dR = createDrop(mixer, bothDrop.color, 0);
+                        pArr.push(animateDirect(dR, center, endR, bothDrop.color, 'x-first').then(() => { sR.style.backgroundColor = bothDrop.color; dR.remove(); }));
+                    }
+                    await Promise.all(pArr);
+                }
+            });
+            await Promise.all(mixPromises);
+            logPanel.innerHTML = `Action: ${step.label}<br>Status: Complete`;
+        }
+
+        function clearVisuals() {
+            svgEl.innerHTML = '';
+            document.querySelectorAll('.sensor').forEach(el => { el.style.backgroundColor = ''; el.style.opacity = 1; });
+            document.querySelectorAll('.well').forEach(el => { el.style.backgroundColor = ''; el.style.borderColor = ''; el.style.color = ''; });
+        }
+
+        function resize() {
+            const container = document.getElementById('mainContainer');
+            if(!container) return;
+            const cw = container.clientWidth; const ch = container.clientHeight;
+            const scale = Math.min(cw / 1280, ch / 800) * 0.98;
+            scalerEl.style.transform = `scale(${scale})`;
+        }
+        
+        const resizeObserver = new ResizeObserver(() => requestAnimationFrame(resize));
+        const mainContainer = document.getElementById('mainContainer');
+        if(mainContainer) resizeObserver.observe(mainContainer);
+
+        function updateLigandCount(val) {
+            numLigands = parseInt(val);
+            document.getElementById('ligandCountVal').textContent = numLigands;
+            clearVisuals();
+            if(appMode === 'STV') {
+                renderGrid();
+                renderSidebar();
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${mode}`).classList.add('active');
+            if(mode === 4) activeColumns = [4, 5];
+            else if(mode === 8) activeColumns = [3, 4, 5, 6];
+            else activeColumns = [1, 2, 3, 4, 5, 6, 7, 8];
+            renderGrid();
+        }
+
+        function renderGrid() {
+            clearVisuals(); gridEl.innerHTML = '';
+            const cols = 8; gridEl.style.gridTemplateColumns = `8% repeat(${cols}, 1fr)`;
+            
+            const addRow = (label, type, param) => {
+                const lbl = document.createElement('div'); lbl.className = 'row-label'; lbl.textContent = label; gridEl.appendChild(lbl);
+                for(let c=1; c<=cols; c++) {
+                    const cell = document.createElement('div'); cell.className = 'cell';
+                    const isActive = activeColumns.includes(c);
+                    
+                    // VISIBILITY LOGIC
+                    if (appMode === 'CMD') {
+                        // CMD: Only Sample rows (C-I) and Buffer row should hide inactive columns.
+                        const isSampleRow = ['C','D','E','F','G','H','I'].includes(label) || type === 'well-bf';
+                        
+                        if(isSampleRow && !isActive) {
+                             cell.style.visibility = 'hidden'; 
+                        } else if (!isActive) {
+                             // Reagents: Just dim slightly, don't hide
+                             cell.style.opacity = 0.5;
+                        }
+                    } else {
+                        // STV: Hide all inactive
+                        const alwaysVisibleRows = ['R', 'A', 'B'];
+                        const isAlwaysVisible = alwaysVisibleRows.includes(param) || type === 'well-r';
+                        if (!isActive && !isAlwaysVisible) cell.style.opacity = 0;
+                    }
+
+                    // CONTENT LOGIC
+                    let displayLabel = c; 
+                    let displaySensorL = (c*2)-1;
+                    let displaySensorR = c*2;
+
+                    if (isActive) {
+                        const logicalIndex = activeColumns.indexOf(c);
+                        if (type === 'lane') displayLabel = logicalIndex + 1;
+                        if (type === 'sensor') {
+                            displaySensorL = (logicalIndex * 2) + 1;
+                            displaySensorR = (logicalIndex * 2) + 2;
+                        }
+                    } 
+
+                    if(type === 'sensor' && isActive) cell.innerHTML = `<div class="sensor-group"><div class="sensor" id="s-${c}-L">${displaySensorL}</div><div class="sensor" id="s-${c}-R">${displaySensorR}</div></div>`;
+                    else if(type === 'mixer' && isActive) cell.innerHTML = `<div class="mixer" id="mix-${c}"></div>`;
+                    else if(type === 'lane') {
+                        const labelText = isActive ? displayLabel : "";
+                        cell.innerHTML = `<div class="lane-box" style="opacity:${isActive?1:0.3}">${labelText}</div>`;
+                    }
+                    else if(type === 'gap') cell.innerHTML = `<div class="gap-point" id="gap-${c}"></div>`;
+                    else if(type === 'well-r') cell.innerHTML = `<div class="well well-r" id="well-R${c}">R${c}</div>`;
+                    else if(type === 'well-bf') cell.innerHTML = `<div class="well well-bf" id="well-BF${c}">BF${c}</div>`;
+                    else if(type === 'well-s') {
+                        cell.innerHTML = `<div class="well well-s" id="well-${param}${c}">${param}${c}</div>`;
+                    }
+                    
+                    gridEl.appendChild(cell);
+                }
+            };
+            addRow('Sensors', 'sensor'); addRow('Mixer', 'mixer'); addRow('Lanes', 'lane'); addRow('', 'gap'); addRow('Reagents', 'well-r');
+            ['A','B','C','D','E','F','G','H','I'].forEach(r => addRow(r, 'well-s', r)); addRow('Buffer', 'well-bf');
+        }
+
+        function renderSidebar() {
+            activityListEl.innerHTML = '';
+            const wf = (appMode === 'CMD') ? getWorkflowCMD() : getWorkflowSTV();
+            
+            wf.forEach(act => {
+                const li = document.createElement('li'); li.className = 'activity-item';
+                const btn = document.createElement('button'); btn.className = 'activity-btn'; btn.innerHTML = `<span>${act.id}</span> <span>&#9662;</span>`;
+                btn.onclick = () => { document.querySelectorAll('.activity-item').forEach(i => i !== li && i.classList.remove('open')); li.classList.toggle('open'); };
+                const ul = document.createElement('ul'); ul.className = 'drop-list';
+                
+                act.steps.forEach(step => {
+                    const dLi = document.createElement('li'); dLi.className = 'drop-item';
+                    dLi.innerHTML = `<div class="drop-indicator"></div> ${step.label}`;
+                    dLi.onclick = (e) => { e.stopPropagation(); runStep(act.id, step, dLi); };
+                    ul.appendChild(dLi);
+                });
+                li.appendChild(btn); li.appendChild(ul); activityListEl.appendChild(li);
+            });
+        }
+        
+        // --- 8. INITIALIZATION & LISTENERS ---
+        const auxToggle = document.getElementById('auxToggle');
+        const bioToggle = document.getElementById('bioToggle'); 
+        const blankToggle = document.getElementById('blankToggle');
+        const appModeToggle = document.getElementById('appModeToggle');
+        
+        function updateUIState() {
+            document.getElementById('chipTypeLabel').textContent = appMode;
+            
+            if (appMode === 'CMD') {
+                document.querySelectorAll('.cmd-only').forEach(e => e.classList.remove('hidden'));
+                document.querySelectorAll('.stv-only').forEach(e => e.classList.add('hidden'));
+            } else {
+                document.querySelectorAll('.cmd-only').forEach(e => e.classList.add('hidden'));
+                document.querySelectorAll('.stv-only').forEach(e => e.classList.remove('hidden'));
+            }
+            
+            clearVisuals();
+            renderGrid();
+            renderSidebar();
+            logPanel.innerHTML = `Mode Switched: ${appMode}`;
+        }
+
+        function init() {
+            // Toggles
+            appModeToggle.addEventListener('change', (e) => {
+                appMode = e.target.checked ? 'STV' : 'CMD';
+                updateUIState();
+            });
+
+            auxToggle.addEventListener('change', (e) => { 
+                isAux = e.target.checked; 
+                clearVisuals(); 
+                // Only re-render sidebar in CMD to update Aux buffer dependencies
+                if(appMode==='CMD') renderSidebar();
+                logPanel.innerText = `Aux: ${isAux?'ON':'OFF'}`; 
+            }); 
+
+            bioToggle.addEventListener('change', (e) => { 
+                isBioAvidin = e.target.checked; 
+                clearVisuals(); 
+                if(appMode==='CMD') renderSidebar(); 
+                logPanel.innerText = `Bio-Avidin: ${isBioAvidin?'ON':'OFF'}`; 
+            });
+
+            blankToggle.addEventListener('change', (e) => {
+                showBlanks = e.target.checked;
+                renderSidebar();
+            });
+
+            // Start defaults
+            appMode = 'CMD';
+            updateUIState();
+            setMode(16); 
+            resize(); 
+        }
+        init();
+    </script>
+</body>
+</html>
